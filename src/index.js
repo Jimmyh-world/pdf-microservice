@@ -1,6 +1,8 @@
 const express = require('express');
 const PDFDocument = require('pdfkit');
 const cors = require('cors');
+require('dotenv').config();
+const { apiKeyAuth } = require('./middleware/auth');
 
 const app = express();
 
@@ -8,8 +10,8 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 app.use(cors());
 
-// PDF Generation endpoint
-app.post('/generate-pdf', (req, res) => {
+// PDF Generation endpoint - protected with API key auth
+app.post('/generate-pdf', apiKeyAuth, (req, res) => {
   try {
     const { content } = req.body;
 
@@ -38,12 +40,12 @@ app.post('/generate-pdf', (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check endpoint - public
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Root endpoint with usage information
+// Root endpoint with usage information - public
 app.get('/', (req, res) => {
   res.send(`
     <html>
@@ -64,6 +66,7 @@ app.get('/', (req, res) => {
         <pre>
 POST /generate-pdf
 Content-Type: application/json
+X-API-Key: your-api-key
 
 {
     "content": "Your text content here"
@@ -73,7 +76,7 @@ Content-Type: application/json
         <h3>Health Check</h3>
         <pre>GET /health</pre>
         
-        <p>For more information, see the <a href="https://github.com/yourusername/pdf-service">GitHub repository</a>.</p>
+        <p>For more information, see the <a href="https://github.com/Jimmyh-world/pdf-microservice">GitHub repository</a>.</p>
       </body>
     </html>
   `);

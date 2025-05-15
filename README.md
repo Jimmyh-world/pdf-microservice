@@ -1,6 +1,6 @@
 # PDF Generation Service
 
-A simple, stateless PDF generation service that converts text content to PDF format.
+A simple, stateless PDF generation service that converts text content to PDF format, secured with API key authentication.
 
 ## Setup
 
@@ -10,7 +10,17 @@ A simple, stateless PDF generation service that converts text content to PDF for
 npm install
 ```
 
-2. Start the service:
+2. Set up environment variables:
+
+```bash
+# Copy the example .env file
+cp .env.example .env
+
+# Edit the .env file to set your own secure API key
+nano .env
+```
+
+3. Start the service:
 
 ```bash
 # Development mode with auto-reload
@@ -24,11 +34,12 @@ The service will be available at `http://localhost:3000`
 
 ## API Endpoints
 
-### Generate PDF
+### Generate PDF (Protected)
 
 ```http
 POST /generate-pdf
 Content-Type: application/json
+X-API-Key: your-api-key
 
 {
     "content": "Your text content here"
@@ -37,13 +48,22 @@ Content-Type: application/json
 
 Response: Binary PDF file
 
-### Health Check
+### Health Check (Public)
 
 ```http
 GET /health
 ```
 
 Response: `{ "status": "ok" }`
+
+## Authentication
+
+This service uses API key authentication to protect the PDF generation endpoint.
+
+- The API key must be included in the `X-API-Key` header for all requests to protected endpoints
+- Set your API key in the `.env` file by changing the `API_KEY_SECRET` value
+- Make sure to use a strong, unique API key in production
+- Keep your API key secret and never expose it in client-side code
 
 ## Testing
 
@@ -61,6 +81,7 @@ const response = await fetch('http://localhost:3000/generate-pdf', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
+    'X-API-Key': 'your-api-key-here',
   },
   body: JSON.stringify({
     content: 'Hello, this is a test PDF!',
@@ -83,7 +104,11 @@ To deploy:
 2. Sign up for a Render account
 3. Create a new Web Service on Render
 4. Connect your GitHub repository
-5. Render will automatically detect the configuration and deploy the service
+5. Render will automatically detect the configuration
+6. Add your API key as an environment variable in Render's dashboard
+   - Set the key as `API_KEY_SECRET`
+   - Set the value to your secure API key
+7. Deploy the service
 
 Once deployed, your PDF service will be available at:
 `https://pdf-service-xxxx.onrender.com` (where xxxx is a unique identifier assigned by Render)
@@ -95,6 +120,7 @@ The same endpoints will be available on your Render URL:
 ```http
 POST https://pdf-service-xxxx.onrender.com/generate-pdf
 Content-Type: application/json
+X-API-Key: your-api-key
 
 {
     "content": "Your text content here"
