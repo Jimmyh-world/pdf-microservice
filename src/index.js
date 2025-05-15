@@ -1,8 +1,11 @@
 const express = require('express');
 const PDFDocument = require('pdfkit');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 const { apiKeyAuth } = require('./middleware/auth');
+const { renderMarkdownToPdf, createCoverPage } = require('./utils/pdfRenderer');
+const { extractMetadata } = require('./utils/metadataParser');
 
 const app = express();
 
@@ -13,30 +16,62 @@ app.use(cors());
 // PDF Generation endpoint - protected with API key auth
 app.post('/generate-pdf', apiKeyAuth, (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, filename, options } = req.body;
 
     if (!content) {
       return res.status(400).json({ error: 'Content is required' });
     }
 
-    // Create PDF document
-    const doc = new PDFDocument();
+    // Parse metadata from content
+    const { metadata, cleanContent } = extractMetadata(content);
+
+    // Determine filename from metadata or request
+    const outputFilename =
+      filename ||
+      metadata.filename ||
+      `${metadata.title || 'generated'}.pdf`.toLowerCase().replace(/\s+/g, '-');
+
+    // Create PDF document with options
+    const doc = new PDFDocument({
+      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      info: {
+        Title: metadata.title || 'Generated Document',
+        Author: metadata.author || '',
+        Subject: metadata.subject || '',
+        Keywords: Array.isArray(metadata.keywords)
+          ? metadata.keywords.join(', ')
+          : metadata.keywords || '',
+      },
+      ...options,
+    });
 
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=generated.pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=${outputFilename}`
+    );
 
     // Pipe PDF to response
     doc.pipe(res);
 
-    // Add content to PDF
-    doc.fontSize(12).text(content);
+    // Create cover page if metadata exists
+    if (metadata.title || metadata.author) {
+      createCoverPage(metadata, doc);
+    }
+
+    // Add content to PDF with markdown rendering
+    renderMarkdownToPdf(cleanContent, doc);
 
     // Finalize PDF
     doc.end();
   } catch (error) {
     console.error('PDF generation error:', error);
-    res.status(500).json({ error: 'Failed to generate PDF' });
+    res.status(500).json({
+      error: 'Failed to generate PDF',
+      details: error.message,
+      stage: 'pdf_generation',
+    });
   }
 });
 
@@ -59,7 +94,7 @@ app.get('/', (req, res) => {
       </head>
       <body>
         <h1>PDF Generation Service</h1>
-        <p>This service converts text content to PDF format.</p>
+        <p>This service converts markdown content to PDF format with support for metadata and formatting.</p>
         
         <h2>API Endpoints</h2>
         <h3>Generate PDF</h3>
@@ -69,7 +104,12 @@ Content-Type: application/json
 X-API-Key: your-api-key
 
 {
-    "content": "Your text content here"
+    "content": "---\\ntitle: Document Title\\nauthor: Author Name\\ndate: 2024-07-29\\n---\\n# My Document\\n\\nThis is a sample document with **markdown** support.",
+    "filename": "optional-custom-filename.pdf",
+    "options": {
+        "size": "A4",
+        "layout": "portrait"
+    }
 }
         </pre>
         

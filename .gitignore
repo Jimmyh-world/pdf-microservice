@@ -25,4 +25,8 @@ coverage/
 
 # Logs
 logs/
-*.log 
+*.log # Development scripts
+node_modules
+test-output
+.env
+.gitignore-d
