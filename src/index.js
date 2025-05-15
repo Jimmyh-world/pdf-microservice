@@ -82,4 +82,20 @@ X-API-Key: your-api-key
   `);
 });
 
+// If this file is run directly, start the server
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  const server = app.listen(port, '0.0.0.0', () => {
+    console.log(`PDF Service running on port ${port}`);
+  });
+
+  // Handle shutdown gracefully
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+    });
+  });
+}
+
 module.exports = app;

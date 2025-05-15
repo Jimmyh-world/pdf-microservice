@@ -3,7 +3,7 @@ services:
     name: pdf-service
     env: node
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node src/index.js
     plan: free
     envVars:
       - key: NODE_ENV
