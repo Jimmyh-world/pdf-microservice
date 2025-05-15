@@ -31,9 +31,9 @@ app.post('/generate-pdf', apiKeyAuth, (req, res) => {
       metadata.filename ||
       `${metadata.title || 'generated'}.pdf`.toLowerCase().replace(/\s+/g, '-');
 
-    // Create PDF document with options
+    // Create PDF document with options and improved spacing settings
     const doc = new PDFDocument({
-      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      margins: { top: 72, bottom: 72, left: 72, right: 72 }, // Standard 1-inch margins
       info: {
         Title: metadata.title || 'Generated Document',
         Author: metadata.author || '',
@@ -42,8 +42,12 @@ app.post('/generate-pdf', apiKeyAuth, (req, res) => {
           ? metadata.keywords.join(', ')
           : metadata.keywords || '',
       },
+      compress: false, // Better quality for text
       ...options,
     });
+
+    // Set global text options for better readability
+    doc.lineGap(4);
 
     // Set response headers
     res.setHeader('Content-Type', 'application/pdf');

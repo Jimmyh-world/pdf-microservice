@@ -75,9 +75,9 @@ function testPdfGeneration() {
     // Create output file path
     const outputFile = path.join(outputDir, 'enhanced-test-output.pdf');
 
-    // Create PDF document
+    // Create PDF document with improved settings
     const doc = new PDFDocument({
-      margins: { top: 50, bottom: 50, left: 50, right: 50 },
+      margins: { top: 72, bottom: 72, left: 72, right: 72 }, // Standard 1-inch margins
       info: {
         Title: metadata.title || 'Test Document',
         Author: metadata.author || '',
@@ -86,7 +86,11 @@ function testPdfGeneration() {
           ? metadata.keywords.join(', ')
           : metadata.keywords || '',
       },
+      compress: false, // Better quality for text
     });
+
+    // Set global text options for better readability
+    doc.lineGap(4);
 
     // Pipe to output file
     const stream = fs.createWriteStream(outputFile);

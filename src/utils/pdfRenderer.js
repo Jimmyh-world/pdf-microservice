@@ -48,6 +48,9 @@ function renderMarkdownToPdf(markdown, doc) {
     throw new Error('Missing required parameters');
   }
 
+  // Set default document properties for better readability
+  doc.lineGap(4); // Add consistent line spacing throughout the document
+
   // Parse and render the markdown content
   const lines = markdown.split('\n');
   let inList = false;
@@ -58,7 +61,7 @@ function renderMarkdownToPdf(markdown, doc) {
 
     // Skip empty lines
     if (!trimmedLine) {
-      doc.moveDown(0.5);
+      doc.moveDown(1);
       continue;
     }
 
@@ -70,8 +73,9 @@ function renderMarkdownToPdf(markdown, doc) {
         .text(trimmedLine.replace('# ', ''), {
           align: 'left',
           underline: false,
+          lineGap: 8, // Extra spacing after headings
         });
-      doc.moveDown(1);
+      doc.moveDown(1.5);
     }
     // Heading 2
     else if (trimmedLine.startsWith('## ')) {
@@ -81,8 +85,9 @@ function renderMarkdownToPdf(markdown, doc) {
         .text(trimmedLine.replace('## ', ''), {
           align: 'left',
           underline: false,
+          lineGap: 6, // Extra spacing after subheadings
         });
-      doc.moveDown(1);
+      doc.moveDown(1.2);
     }
     // Heading 3
     else if (trimmedLine.startsWith('### ')) {
@@ -92,8 +97,9 @@ function renderMarkdownToPdf(markdown, doc) {
         .text(trimmedLine.replace('### ', ''), {
           align: 'left',
           underline: false,
+          lineGap: 5, // Extra spacing after smaller headings
         });
-      doc.moveDown(0.5);
+      doc.moveDown(1);
     }
     // Bullet List
     else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
@@ -102,12 +108,13 @@ function renderMarkdownToPdf(markdown, doc) {
       doc.fontSize(12).font('Helvetica');
 
       // Add the bullet point and indent the content
-      doc.text('• ', { continued: true, indent: 20 });
+      doc.text('• ', { continued: true, indent: 20, lineGap: 3 });
 
       // Process any inline formatting in the list item
       processInlineFormatting(listContent, doc);
 
       inList = true;
+      doc.moveDown(0.5); // Add space between list items
     }
     // Numbered list
     else if (/^\d+\.\s/.test(trimmedLine)) {
@@ -117,12 +124,13 @@ function renderMarkdownToPdf(markdown, doc) {
 
       // Add the number and indent the content
       const number = trimmedLine.match(/^\d+\./)[0];
-      doc.text(`${number} `, { continued: true, indent: 20 });
+      doc.text(`${number} `, { continued: true, indent: 20, lineGap: 3 });
 
       // Process any inline formatting in the list item
       processInlineFormatting(listContent, doc);
 
       inList = true;
+      doc.moveDown(0.5); // Add space between list items
     }
     // Blockquote
     else if (trimmedLine.startsWith('> ')) {
@@ -135,10 +143,11 @@ function renderMarkdownToPdf(markdown, doc) {
         .text(quoteContent, {
           indent: 20,
           align: 'left',
+          lineGap: 3,
         });
 
       doc.fillColor('black');
-      doc.moveDown(0.5);
+      doc.moveDown(1);
     }
     // Horizontal rule
     else if (trimmedLine.match(/^[\-\*\_]{3,}$/)) {
@@ -146,7 +155,7 @@ function renderMarkdownToPdf(markdown, doc) {
         .moveTo(doc.page.margins.left, doc.y)
         .lineTo(doc.page.width - doc.page.margins.right, doc.y)
         .stroke();
-      doc.moveDown(1);
+      doc.moveDown(1.5);
     }
     // Code block (simple implementation)
     else if (trimmedLine.startsWith('```')) {
@@ -167,7 +176,7 @@ function renderMarkdownToPdf(markdown, doc) {
         align: 'left',
         indent: 10,
         backgroundColor: '#f4f4f4',
-        lineGap: 2,
+        lineGap: 3,
       });
 
       // Reset to normal text formatting
@@ -175,18 +184,18 @@ function renderMarkdownToPdf(markdown, doc) {
 
       // Skip to the end of code block
       i = codeBlockEnd;
-      doc.moveDown(1);
+      doc.moveDown(1.5);
     }
     // Regular paragraph with inline formatting
     else {
       // Reset to normal font if coming from heading or list
-      doc.fontSize(12).font('Helvetica');
+      doc.fontSize(12).font('Helvetica').lineGap(4);
 
       // Process inline formatting
       processInlineFormatting(trimmedLine, doc);
 
       inList = false;
-      doc.moveDown(0.5);
+      doc.moveDown(1); // Proper spacing after paragraphs
     }
   }
 }
@@ -208,6 +217,7 @@ function createCoverPage(metadata, doc) {
   // Title
   doc.fontSize(28).font('Helvetica-Bold').text(title, {
     align: 'center',
+    lineGap: 8,
   });
 
   doc.moveDown(2);
@@ -216,6 +226,7 @@ function createCoverPage(metadata, doc) {
   if (author) {
     doc.fontSize(14).font('Helvetica-Oblique').text(`By: ${author}`, {
       align: 'center',
+      lineGap: 4,
     });
     doc.moveDown(1);
   }
@@ -223,6 +234,7 @@ function createCoverPage(metadata, doc) {
   // Date
   doc.fontSize(12).font('Helvetica').text(date, {
     align: 'center',
+    lineGap: 4,
   });
 
   // Add a new page after the cover
