@@ -1,12 +1,19 @@
 /**
  * PDF Rendering Utilities
  *
- * Provides functions to convert markdown to PDF using PDFKit
+ * This module provides functionality to convert Markdown content to PDF using PDFKit.
+ * It supports various Markdown features including headings, lists, code blocks, blockquotes,
+ * and inline formatting (bold, italic). The module also handles document metadata and
+ * cover page generation.
+ *
+ * @module utils/pdfRenderer
  */
 
 /**
  * Process inline markdown formatting (bold, italic, code)
- * @param {string} text - The text to process
+ * Converts markdown formatting syntax to PDFKit styling
+ *
+ * @param {string} text - The text to process (may contain ** or __ for bold)
  * @param {PDFDocument} doc - The PDFKit document instance
  */
 function processInlineFormatting(text, doc) {
@@ -40,8 +47,21 @@ function processInlineFormatting(text, doc) {
 
 /**
  * Renders Markdown content to a PDFKit document
+ * This is the main function for converting Markdown to PDF, handling various
+ * formatting elements and ensuring proper spacing and layout.
+ *
+ * Supported Markdown features:
+ * - Headings (# to ###)
+ * - Lists (bulleted with - or *)
+ * - Numbered lists (1. 2. etc)
+ * - Blockquotes (> text)
+ * - Code blocks (```)
+ * - Horizontal rules (---)
+ * - Bold formatting (** or __)
+ *
  * @param {string} markdown - The markdown content to render
  * @param {PDFDocument} doc - The PDFKit document instance
+ * @throws {Error} If markdown or doc is not provided
  */
 function renderMarkdownToPdf(markdown, doc) {
   if (!markdown || !doc) {
@@ -202,7 +222,13 @@ function renderMarkdownToPdf(markdown, doc) {
 
 /**
  * Creates a cover page for the PDF
- * @param {Object} metadata - The document metadata (title, author, date)
+ * Generates a professional cover page with title, author, and date based on
+ * the provided metadata.
+ *
+ * @param {Object} metadata - The document metadata
+ * @param {string} [metadata.title] - The document title to display
+ * @param {string} [metadata.author] - The author's name
+ * @param {string} [metadata.date] - The document date (defaults to current date if not provided)
  * @param {PDFDocument} doc - The PDFKit document instance
  */
 function createCoverPage(metadata, doc) {
@@ -243,8 +269,10 @@ function createCoverPage(metadata, doc) {
 
 /**
  * Adds a footer with page number to each page
+ * Useful for multi-page documents to help with navigation
+ *
  * @param {PDFDocument} doc - The PDFKit document instance
- * @param {string} footerText - Optional additional footer text
+ * @param {string} [footerText=''] - Optional additional footer text
  */
 function addPageFooter(doc, footerText = '') {
   const pageNumber = doc.bufferedPageRange().count;

@@ -1,13 +1,34 @@
 /**
  * Metadata Parser Utilities
  *
- * Extracts metadata from markdown content with YAML front matter
+ * This module provides functionality for extracting and parsing YAML frontmatter
+ * from Markdown content. It handles different YAML formats and converts them
+ * to JavaScript objects that can be used for PDF document metadata.
+ *
+ * @module utils/metadataParser
  */
 
 /**
  * Extracts YAML front matter from markdown content
+ *
+ * Parses YAML metadata at the beginning of a Markdown document, supporting both
+ * triple-dash (---) and code block (```yaml) formats. The metadata is converted
+ * to a JavaScript object while the clean content without the YAML block is returned.
+ *
+ * Example YAML frontmatter:
+ * ```
+ * ---
+ * title: Document Title
+ * author: Author Name
+ * date: 2024-07-30
+ * keywords: tag1, tag2, tag3
+ * ---
+ * ```
+ *
  * @param {string} content - The markdown content with potential YAML front matter
- * @returns {Object} An object with metadata and cleanContent properties
+ * @returns {Object} Object with extracted metadata and clean content
+ * @returns {Object} result.metadata - Parsed metadata as a JavaScript object
+ * @returns {string} result.cleanContent - Original content without the YAML block
  */
 function extractMetadata(content) {
   if (!content) {

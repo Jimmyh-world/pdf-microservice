@@ -1,134 +1,163 @@
-# PDF Generation Service
+# PDF Microservice
 
-A simple, stateless PDF generation service that converts text content to PDF format, secured with API key authentication.
+A lightweight, scalable microservice for generating PDF documents from Markdown and text content.
 
-## Setup
+## Features
 
-1. Install dependencies:
+- ✨ **Convert Markdown to PDF** with rich formatting support
+- 🔒 **API Key Authentication** for secure access
+- 📝 **YAML Frontmatter** for document metadata
+- 🎨 **Cover Page Generation** based on metadata
+- 📋 **Table of Contents** support with navigation
+- 📱 **Responsive Design** for optimal viewing on any device
+- 🔄 **n8n Integration** with LLM preprocessing workflow
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 16+
+- npm or yarn
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/Jimmyh-world/pdf-microservice.git
+cd pdf-microservice/pdf-service
+
+# Install dependencies
 npm install
-```
 
-2. Set up environment variables:
-
-```bash
-# Copy the example .env file
+# Create environment file
 cp .env.example .env
-
-# Edit the .env file to set your own secure API key
-nano .env
+# Then edit .env to add your API key
 ```
 
-3. Start the service:
+### Configuration
+
+Edit `.env` file with your configuration:
+
+```
+PORT=3000
+API_KEY=your-secure-api-key-here
+NODE_ENV=production
+```
+
+### Running the service
 
 ```bash
-# Development mode with auto-reload
+# Development mode
 npm run dev
 
 # Production mode
 npm start
 ```
 
-The service will be available at `http://localhost:3000`
+## API Reference
 
-## API Endpoints
+### Generate PDF
 
-### Generate PDF (Protected)
+Converts Markdown or text content to a PDF document.
 
-```http
+```
 POST /generate-pdf
-Content-Type: application/json
-X-API-Key: your-api-key
+```
 
+#### Headers
+
+| Header       | Value            | Description                        |
+| ------------ | ---------------- | ---------------------------------- |
+| Content-Type | application/json | Indicates JSON format              |
+| X-API-Key    | your-api-key     | Authentication key for the service |
+
+#### Request Body
+
+```json
 {
-    "content": "Your text content here"
+  "content": "# Your Markdown Content\n\nThis is a **bold** statement.",
+  "filename": "optional-custom-filename.pdf",
+  "options": {
+    "size": "A4",
+    "layout": "portrait"
+  }
 }
 ```
 
-Response: Binary PDF file
+| Parameter | Type   | Required | Description                                |
+| --------- | ------ | -------- | ------------------------------------------ |
+| content   | string | Yes      | Markdown or text content for the PDF       |
+| filename  | string | No       | Custom filename for the generated PDF      |
+| options   | object | No       | PDF generation options (size, layout, etc) |
 
-### Health Check (Public)
+#### Response
 
-```http
+The response is the generated PDF file with appropriate headers:
+
+```
+Content-Type: application/pdf
+Content-Disposition: attachment; filename=your-filename.pdf
+```
+
+### Health Check
+
+```
 GET /health
 ```
 
-Response: `{ "status": "ok" }`
+Returns the current service status.
 
-## Authentication
+## Markdown Features
 
-This service uses API key authentication to protect the PDF generation endpoint.
+The service supports the following Markdown features:
 
-- The API key must be included in the `X-API-Key` header for all requests to protected endpoints
-- Set your API key in the `.env` file by changing the `API_KEY_SECRET` value
-- Make sure to use a strong, unique API key in production
-- Keep your API key secret and never expose it in client-side code
+- **Headings** (# to ######)
+- **Emphasis** (_italic_, **bold**)
+- **Lists** (ordered and unordered)
+- **Links** with custom text
+- **Blockquotes**
+- **Code blocks** with syntax highlighting
+- **Horizontal rules**
+- **YAML Frontmatter** for metadata
 
-## Testing
+### YAML Frontmatter
 
-Run tests with:
+You can include metadata at the top of your Markdown:
 
-```bash
-npm test
+```markdown
+---
+title: Document Title
+author: Author Name
+date: 2024-07-30
+keywords: tag1, tag2, tag3
+---
+
+# Your content starts here
 ```
 
-## Example Usage
+This metadata will be used to generate a cover page and set PDF document properties.
 
-```javascript
-// Using fetch
-const response = await fetch('http://localhost:3000/generate-pdf', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': 'your-api-key-here',
-  },
-  body: JSON.stringify({
-    content: 'Hello, this is a test PDF!',
-  }),
-});
+## Integration with n8n
 
-// Get the PDF blob
-const pdfBlob = await response.blob();
-```
+This microservice works well with n8n automation platform. We provide a ready-to-use workflow in the `n8n-workflows` directory that:
 
-## Deployment
+1. Uses LLM to preprocess and validate Markdown
+2. Formats the content for optimal PDF rendering
+3. Calls the PDF service with proper parameters
+4. Returns the generated PDF
 
-### Deploying to Render
+## Roadmap
 
-This project includes a `render.yaml` file for easy deployment to [Render](https://render.com).
+- [ ] Table support in Markdown
+- [ ] Image embedding
+- [ ] Custom CSS themes
+- [ ] Header/footer customization
+- [ ] PDF compression options
 
-To deploy:
+## Contributing
 
-1. Fork or push this repository to GitHub
-2. Sign up for a Render account
-3. Create a new Web Service on Render
-4. Connect your GitHub repository
-5. Render will automatically detect the configuration
-6. Add your API key as an environment variable in Render's dashboard
-   - Set the key as `API_KEY_SECRET`
-   - Set the value to your secure API key
-7. Deploy the service
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Once deployed, your PDF service will be available at:
-`https://pdf-service-xxxx.onrender.com` (where xxxx is a unique identifier assigned by Render)
+## License
 
-#### API Endpoints on Render
-
-The same endpoints will be available on your Render URL:
-
-```http
-POST https://pdf-service-xxxx.onrender.com/generate-pdf
-Content-Type: application/json
-X-API-Key: your-api-key
-
-{
-    "content": "Your text content here"
-}
-```
-
-And the health check:
-
-```http
-GET https://pdf-service-xxxx.onrender.com/health
-```
+This project is licensed under the ISC License.
