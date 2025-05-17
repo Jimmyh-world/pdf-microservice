@@ -1,163 +1,124 @@
 # PDF Microservice
 
-A lightweight, scalable microservice for generating PDF documents from Markdown and text content.
+A microservice for generating PDFs from Markdown content with precise formatting control and rich features.
 
 ## Features
 
-- ✨ **Convert Markdown to PDF** with rich formatting support
-- 🔒 **API Key Authentication** for secure access
-- 📝 **YAML Frontmatter** for document metadata
-- 🎨 **Cover Page Generation** based on metadata
-- 📋 **Table of Contents** support with navigation
-- 📱 **Responsive Design** for optimal viewing on any device
-- 🔄 **n8n Integration** with LLM preprocessing workflow
+- Convert Markdown to professionally formatted PDFs
+- Support for headings, lists, code blocks, blockquotes, and inline formatting
+- YAML frontmatter for document metadata
+- Cover page generation based on metadata
+- Table of Contents generation
+- Comprehensive theming system for customization
+- PDF preview system for testing and development
+- Clean API for easy integration with any platform
+- API key authentication for security
 
-## Quick Start
-
-### Prerequisites
-
-- Node.js 16+
-- npm or yarn
+## Setup & Usage
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Jimmyh-world/pdf-microservice.git
+git clone https://github.com/yourusername/pdf-microservice.git
 cd pdf-microservice/pdf-service
 
 # Install dependencies
 npm install
 
-# Create environment file
+# Setup environment variables
 cp .env.example .env
-# Then edit .env to add your API key
+# Edit .env with your desired configuration
 ```
 
-### Configuration
-
-Edit `.env` file with your configuration:
-
-```
-PORT=3000
-API_KEY=your-secure-api-key-here
-NODE_ENV=production
-```
-
-### Running the service
+### Running the Service
 
 ```bash
-# Development mode
+# Development mode with automatic restart
 npm run dev
 
 # Production mode
 npm start
 ```
 
-## API Reference
+### Environment Variables
+
+- `PORT`: Port to run the service on (default: 3000)
+- `API_KEY`: Secret key for API authentication
+- `NODE_ENV`: Environment (development/production)
+
+## API Endpoints
 
 ### Generate PDF
-
-Converts Markdown or text content to a PDF document.
 
 ```
 POST /generate-pdf
 ```
 
-#### Headers
-
-| Header       | Value            | Description                        |
-| ------------ | ---------------- | ---------------------------------- |
-| Content-Type | application/json | Indicates JSON format              |
-| X-API-Key    | your-api-key     | Authentication key for the service |
-
-#### Request Body
+Request body:
 
 ```json
 {
-  "content": "# Your Markdown Content\n\nThis is a **bold** statement.",
-  "filename": "optional-custom-filename.pdf",
+  "content": "# Your Markdown Content\n\nThis is a paragraph with **bold** and *italic* text.",
+  "filename": "output.pdf",
   "options": {
-    "size": "A4",
-    "layout": "portrait"
+    "theme": {
+      "fonts": {
+        "body": "Helvetica",
+        "heading": "Helvetica-Bold"
+      },
+      "fontSize": {
+        "body": 12,
+        "heading": 16
+      }
+    }
   }
 }
 ```
 
-| Parameter | Type   | Required | Description                                |
-| --------- | ------ | -------- | ------------------------------------------ |
-| content   | string | Yes      | Markdown or text content for the PDF       |
-| filename  | string | No       | Custom filename for the generated PDF      |
-| options   | object | No       | PDF generation options (size, layout, etc) |
-
-#### Response
-
-The response is the generated PDF file with appropriate headers:
+Headers:
 
 ```
-Content-Type: application/pdf
-Content-Disposition: attachment; filename=your-filename.pdf
+x-api-key: your-api-key
 ```
 
-### Health Check
+### PDF Preview
 
 ```
-GET /health
+POST /api/preview-pdf
 ```
 
-Returns the current service status.
+Request body: Same as generate-pdf endpoint
+(No API key required for the preview endpoint)
 
-## Markdown Features
+## Testing
 
-The service supports the following Markdown features:
+The project includes comprehensive test suites:
 
-- **Headings** (# to ######)
-- **Emphasis** (_italic_, **bold**)
-- **Lists** (ordered and unordered)
-- **Links** with custom text
-- **Blockquotes**
-- **Code blocks** with syntax highlighting
-- **Horizontal rules**
-- **YAML Frontmatter** for metadata
+```bash
+# Run all tests
+npm test
 
-### YAML Frontmatter
+# Run only list rendering fix tests
+npm run test:list
 
-You can include metadata at the top of your Markdown:
+# Run only PDF rendering tests
+npm run test:pdf
 
-```markdown
----
-title: Document Title
-author: Author Name
-date: 2024-07-30
-keywords: tag1, tag2, tag3
----
-
-# Your content starts here
+# Run only utility tests
+npm run test:utils
 ```
 
-This metadata will be used to generate a cover page and set PDF document properties.
+## Documentation
 
-## Integration with n8n
+- Main API documentation can be found in the `/docs` directory
+- Fix documentation for rendering issues is in `/docs/fixes`
+- Test files are organized in `/src/tests`
 
-This microservice works well with n8n automation platform. We provide a ready-to-use workflow in the `n8n-workflows` directory that:
+## Recent Fixes
 
-1. Uses LLM to preprocess and validate Markdown
-2. Formats the content for optimal PDF rendering
-3. Calls the PDF service with proper parameters
-4. Returns the generated PDF
-
-## Roadmap
-
-- [ ] Table support in Markdown
-- [ ] Image embedding
-- [ ] Custom CSS themes
-- [ ] Header/footer customization
-- [ ] PDF compression options
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+We've recently fixed a critical issue with list rendering where text would stack vertically. See the detailed documentation in `/docs/fixes`.
 
 ## License
 
-This project is licensed under the ISC License.
+ISC

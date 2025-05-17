@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node src/tests/index.js",
+    "test:list": "node src/tests/index.js list",
+    "test:pdf": "node src/tests/index.js pdf",
+    "test:utils": "node src/tests/index.js utils"
   },
   "keywords": [
     "pdf",
