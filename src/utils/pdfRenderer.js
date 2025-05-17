@@ -3,46 +3,161 @@
  *
  * This module provides functionality to convert Markdown content to PDF using PDFKit.
  * It supports various Markdown features including headings, lists, code blocks, blockquotes,
- * and inline formatting (bold, italic). The module also handles document metadata and
+ * and inline formatting (bold, italic, code). The module also handles document metadata and
  * cover page generation.
  *
  * @module utils/pdfRenderer
  */
 
+// Default theme settings
+const DEFAULT_THEME = {
+  fonts: {
+    heading: 'Helvetica-Bold',
+    body: 'Helvetica',
+    italic: 'Helvetica-Oblique',
+    bold: 'Helvetica-Bold',
+    code: 'Courier',
+  },
+  fontSize: {
+    h1: 24,
+    h2: 20,
+    h3: 16,
+    body: 12,
+    code: 10,
+    footer: 8,
+  },
+  colors: {
+    text: '#000000',
+    heading: '#000000',
+    blockquote: '#666666',
+    codeBackground: '#f4f4f4',
+    footer: '#666666',
+    link: '#0000EE',
+  },
+  margins: {
+    top: 72,
+    bottom: 72,
+    left: 72,
+    right: 72,
+  },
+  spacing: {
+    paragraph: 0.8,
+    heading1: 1,
+    heading2: 0.8,
+    heading3: 0.7,
+    list: 0.8,
+    blockquote: 0.8,
+    codeBlock: 1,
+    lineGap: 4,
+  },
+};
+
 /**
  * Process inline markdown formatting (bold, italic, code)
  * Converts markdown formatting syntax to PDFKit styling
  *
- * @param {string} text - The text to process (may contain ** or __ for bold)
+ * @param {string} text - The text to process (may contain ** or __ for bold, _ for italic, ` for code)
  * @param {PDFDocument} doc - The PDFKit document instance
+ * @param {Object} theme - Theme settings for formatting
+ * @param {number} xPosition - The x position to start text (for explicit positioning)
+ * @param {number} widthLimit - The maximum width for text content
  */
-function processInlineFormatting(text, doc) {
+function processInlineFormatting(
+  text,
+  doc,
+  theme = DEFAULT_THEME,
+  xPosition = null,
+  widthLimit = null
+) {
   // Save the current font settings
-  const currentFont = doc._font ? doc._font.name : 'Helvetica';
-  const currentFontSize = doc._fontSize || 12;
+  const currentFont = doc._font ? doc._font.name : theme.fonts.body;
+  const currentFontSize = doc._fontSize || theme.fontSize.body;
 
-  // Handle bold text with ** or __
-  let parts = text.split(/(\*\*.*?\*\*|__.*?__)/g);
-  let result = '';
+  // Calculate position and width if not provided
+  const startX = xPosition !== null ? xPosition : doc.page.margins.left;
+  const contentWidth =
+    widthLimit !== null
+      ? widthLimit
+      : doc.page.width - doc.page.margins.left - doc.page.margins.right;
 
-  parts.forEach((part) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      // Bold text
-      doc.font('Helvetica-Bold');
-      doc.text(part.substring(2, part.length - 2), { continued: true });
-      doc.font(currentFont);
-    } else if (part.startsWith('__') && part.endsWith('__')) {
-      // Also bold text
-      doc.font('Helvetica-Bold');
-      doc.text(part.substring(2, part.length - 2), { continued: true });
-      doc.font(currentFont);
-    } else if (part.trim()) {
-      // Regular text or other formatting
-      doc.text(part, { continued: true });
-    }
+  // Start a new text segment at the specified position
+  let isFirstSegment = true;
+
+  // Set explicit options for text segments to ensure consistent alignment
+  const getTextOptions = (isFirst) => ({
+    continued: true,
+    align: 'left',
+    width: contentWidth,
   });
 
-  doc.text('', { continued: false });
+  // Handle formatting in a more robust way with replacements
+  // Process formatting in order of precedence: code, bold, italic
+  let processed = text;
+
+  // Process inline code first (since it shouldn't have nested formatting)
+  processed = processed.replace(/`([^`]+)`/g, (match, code) => {
+    // For first segment, we need explicit positioning
+    const options = getTextOptions(isFirstSegment);
+    if (isFirstSegment) {
+      doc.text('', startX, doc.y, { continued: true });
+      isFirstSegment = false;
+    }
+
+    doc.font(theme.fonts.code).text(code, options);
+    doc.font(currentFont);
+    return '';
+  });
+
+  // Process bold text
+  processed = processed.replace(
+    /\*\*([^*]+)\*\*|__([^_]+)__/g,
+    (match, bold1, bold2) => {
+      const content = bold1 || bold2;
+
+      // For first segment, we need explicit positioning
+      const options = getTextOptions(isFirstSegment);
+      if (isFirstSegment) {
+        doc.text('', startX, doc.y, { continued: true });
+        isFirstSegment = false;
+      }
+
+      doc.font(theme.fonts.bold).text(content, options);
+      doc.font(currentFont);
+      return '';
+    }
+  );
+
+  // Process italic text
+  processed = processed.replace(/_([^_]+)_/g, (match, italic) => {
+    // For first segment, we need explicit positioning
+    const options = getTextOptions(isFirstSegment);
+    if (isFirstSegment) {
+      doc.text('', startX, doc.y, { continued: true });
+      isFirstSegment = false;
+    }
+
+    doc.font(theme.fonts.italic).text(italic, options);
+    doc.font(currentFont);
+    return '';
+  });
+
+  // Process remaining text
+  if (processed.trim()) {
+    // For first segment, we need explicit positioning
+    const options = getTextOptions(isFirstSegment);
+    if (isFirstSegment) {
+      doc.text(processed, startX, doc.y, options);
+    } else {
+      doc.text(processed, options);
+    }
+  }
+
+  // End the line with explicit alignment
+  doc.text('', {
+    continued: false,
+    align: 'left',
+    width: contentWidth,
+  });
 }
 
 /**
@@ -58,18 +173,74 @@ function processInlineFormatting(text, doc) {
  * - Code blocks (```)
  * - Horizontal rules (---)
  * - Bold formatting (** or __)
+ * - Italic formatting (_text_)
+ * - Inline code (`code`)
  *
  * @param {string} markdown - The markdown content to render
  * @param {PDFDocument} doc - The PDFKit document instance
+ * @param {Object} theme - Optional theme settings to override defaults
  * @throws {Error} If markdown or doc is not provided
  */
-function renderMarkdownToPdf(markdown, doc) {
+function renderMarkdownToPdf(markdown, doc, theme = {}) {
   if (!markdown || !doc) {
     throw new Error('Missing required parameters');
   }
 
+  // Merge theme with defaults
+  const mergedTheme = {
+    ...DEFAULT_THEME,
+    fonts: { ...DEFAULT_THEME.fonts, ...theme.fonts },
+    fontSize: { ...DEFAULT_THEME.fontSize, ...theme.fontSize },
+    colors: { ...DEFAULT_THEME.colors, ...theme.colors },
+    margins: { ...DEFAULT_THEME.margins, ...theme.margins },
+    spacing: { ...DEFAULT_THEME.spacing, ...theme.spacing },
+  };
+
+  // Add metadata to the PDF - ensures proper date format
+  const creationDate = new Date();
+  if (!doc.info) {
+    doc.info = {
+      Title: 'Markdown Rendered PDF',
+      Author: 'PDF Microservice',
+      Subject: 'Markdown to PDF Conversion',
+      Keywords: 'markdown, pdf, conversion',
+      Creator: 'PDF Microservice',
+      Producer: 'PDFKit',
+      CreationDate: creationDate,
+    };
+  } else {
+    // Ensure CreationDate is a Date object
+    doc.info.CreationDate = creationDate;
+  }
+
+  // Set up page numbering
+  let currentPage = 1;
+
+  // Add footer to the first page
+  addPageFooter(doc, currentPage, '', mergedTheme);
+
+  // Handle new pages being added - add footer to each new page
+  doc.on('pageAdded', () => {
+    currentPage++;
+    addPageFooter(doc, currentPage, '', mergedTheme);
+  });
+
   // Set default document properties for better readability
-  doc.lineGap(4); // Add consistent line spacing throughout the document
+  doc.font(mergedTheme.fonts.body);
+  doc.fontSize(mergedTheme.fontSize.body);
+  doc.lineGap(mergedTheme.spacing.lineGap); // Add consistent line spacing throughout the document
+  doc.fillColor(mergedTheme.colors.text);
+
+  // CRITICAL: Calculate content width and positions for consistent rendering
+  const leftMargin = doc.page.margins.left;
+  const rightMargin = doc.page.margins.right;
+  const contentWidth = doc.page.width - leftMargin - rightMargin;
+
+  // Force reset text position and alignment
+  doc.text('', leftMargin, doc.y, {
+    align: 'left',
+    continued: false,
+  });
 
   // Parse and render the markdown content
   const lines = markdown.split('\n');
@@ -81,103 +252,143 @@ function renderMarkdownToPdf(markdown, doc) {
 
     // Skip empty lines
     if (!trimmedLine) {
-      doc.moveDown(1);
+      doc.moveDown(0.5); // Reduced spacing for empty lines
       continue;
     }
+
+    // Save current Y position
+    const currentY = doc.y;
 
     // Heading 1
     if (trimmedLine.startsWith('# ')) {
       doc
-        .fontSize(24)
-        .font('Helvetica-Bold')
-        .text(trimmedLine.replace('# ', ''), {
+        .fontSize(mergedTheme.fontSize.h1)
+        .font(mergedTheme.fonts.heading)
+        .fillColor(mergedTheme.colors.heading)
+        // Explicitly position text with x coordinate
+        .text(trimmedLine.replace('# ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: 8, // Extra spacing after headings
+          lineGap: mergedTheme.spacing.lineGap + 2,
+          width: contentWidth,
         });
-      doc.moveDown(1.5);
+      doc.moveDown(mergedTheme.spacing.heading1);
+      doc.fillColor(mergedTheme.colors.text);
     }
     // Heading 2
     else if (trimmedLine.startsWith('## ')) {
       doc
-        .fontSize(20)
-        .font('Helvetica-Bold')
-        .text(trimmedLine.replace('## ', ''), {
+        .fontSize(mergedTheme.fontSize.h2)
+        .font(mergedTheme.fonts.heading)
+        .fillColor(mergedTheme.colors.heading)
+        // Explicitly position text with x coordinate
+        .text(trimmedLine.replace('## ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: 6, // Extra spacing after subheadings
+          lineGap: mergedTheme.spacing.lineGap,
+          width: contentWidth,
         });
-      doc.moveDown(1.2);
+      doc.moveDown(mergedTheme.spacing.heading2);
+      doc.fillColor(mergedTheme.colors.text);
     }
     // Heading 3
     else if (trimmedLine.startsWith('### ')) {
       doc
-        .fontSize(16)
-        .font('Helvetica-Bold')
-        .text(trimmedLine.replace('### ', ''), {
+        .fontSize(mergedTheme.fontSize.h3)
+        .font(mergedTheme.fonts.heading)
+        .fillColor(mergedTheme.colors.heading)
+        // Explicitly position text with x coordinate
+        .text(trimmedLine.replace('### ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: 5, // Extra spacing after smaller headings
+          lineGap: mergedTheme.spacing.lineGap - 1,
+          width: contentWidth,
         });
-      doc.moveDown(1);
+      doc.moveDown(mergedTheme.spacing.heading3);
+      doc.fillColor(mergedTheme.colors.text);
     }
     // Bullet List
     else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
       const listContent = trimmedLine.substring(2);
+      const listIndent = 20;
 
-      doc.fontSize(12).font('Helvetica');
+      doc.fontSize(mergedTheme.fontSize.body).font(mergedTheme.fonts.body);
 
-      // Add the bullet point and indent the content
-      doc.text('• ', { continued: true, indent: 20, lineGap: 3 });
+      // Add the bullet point with explicit positioning
+      // We position at the list indentation
+      doc.text('• ', leftMargin + listIndent, currentY, {
+        continued: true,
+        align: 'left',
+        width: contentWidth - listIndent,
+      });
 
       // Process any inline formatting in the list item
-      processInlineFormatting(listContent, doc);
+      processInlineFormatting(
+        listContent,
+        doc,
+        mergedTheme,
+        leftMargin + listIndent + 10,
+        contentWidth - listIndent - 10
+      );
 
       inList = true;
-      doc.moveDown(0.5); // Add space between list items
+      doc.moveDown(mergedTheme.spacing.list);
     }
     // Numbered list
     else if (/^\d+\.\s/.test(trimmedLine)) {
       const listContent = trimmedLine.replace(/^\d+\.\s/, '');
+      const listIndent = 20;
 
-      doc.fontSize(12).font('Helvetica');
+      doc.fontSize(mergedTheme.fontSize.body).font(mergedTheme.fonts.body);
 
-      // Add the number and indent the content
+      // Add the number with explicit positioning
       const number = trimmedLine.match(/^\d+\./)[0];
-      doc.text(`${number} `, { continued: true, indent: 20, lineGap: 3 });
+      doc.text(`${number} `, leftMargin + listIndent, currentY, {
+        continued: true,
+        align: 'left',
+        width: contentWidth - listIndent,
+      });
 
       // Process any inline formatting in the list item
-      processInlineFormatting(listContent, doc);
+      processInlineFormatting(
+        listContent,
+        doc,
+        mergedTheme,
+        leftMargin + listIndent + 20,
+        contentWidth - listIndent - 20
+      );
 
       inList = true;
-      doc.moveDown(0.5); // Add space between list items
+      doc.moveDown(mergedTheme.spacing.list);
     }
     // Blockquote
     else if (trimmedLine.startsWith('> ')) {
       const quoteContent = trimmedLine.substring(2);
+      const quoteIndent = 20;
 
+      // Draw blockquote with explicit positioning
       doc
-        .fontSize(12)
-        .font('Helvetica-Oblique')
-        .fillColor('gray')
-        .text(quoteContent, {
-          indent: 20,
+        .fontSize(mergedTheme.fontSize.body)
+        .font(mergedTheme.fonts.italic)
+        .fillColor(mergedTheme.colors.blockquote)
+        .text(quoteContent, leftMargin + quoteIndent, currentY, {
           align: 'left',
-          lineGap: 3,
+          lineGap: mergedTheme.spacing.lineGap,
+          width: contentWidth - quoteIndent,
         });
 
-      doc.fillColor('black');
-      doc.moveDown(1);
+      doc.fillColor(mergedTheme.colors.text);
+      doc.moveDown(mergedTheme.spacing.blockquote);
     }
     // Horizontal rule
     else if (trimmedLine.match(/^[\-\*\_]{3,}$/)) {
       doc
-        .moveTo(doc.page.margins.left, doc.y)
-        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
+        .moveTo(leftMargin, doc.y)
+        .lineTo(doc.page.width - rightMargin, doc.y)
         .stroke();
-      doc.moveDown(1.5);
+      doc.moveDown(1);
     }
-    // Code block (simple implementation)
+    // Code block
     else if (trimmedLine.startsWith('```')) {
       // Find the end of the code block
       let codeBlockEnd = i + 1;
@@ -190,32 +401,63 @@ function renderMarkdownToPdf(markdown, doc) {
 
       // Extract the code content
       const codeContent = lines.slice(i + 1, codeBlockEnd).join('\n');
+      const codeIndent = 10;
 
-      // Draw code block
-      doc.fontSize(10).font('Courier').fillColor('black').text(codeContent, {
-        align: 'left',
-        indent: 10,
-        backgroundColor: '#f4f4f4',
-        lineGap: 3,
-      });
+      // Draw code block with explicit positioning
+      doc
+        .fontSize(mergedTheme.fontSize.code)
+        .font(mergedTheme.fonts.code)
+        .fillColor(mergedTheme.colors.text)
+        .text(codeContent, leftMargin + codeIndent, currentY, {
+          align: 'left',
+          backgroundColor: mergedTheme.colors.codeBackground,
+          lineGap: mergedTheme.spacing.lineGap,
+          width: contentWidth - codeIndent * 2,
+        });
 
       // Reset to normal text formatting
-      doc.font('Helvetica').fontSize(12);
+      doc.font(mergedTheme.fonts.body).fontSize(mergedTheme.fontSize.body);
 
       // Skip to the end of code block
       i = codeBlockEnd;
-      doc.moveDown(1.5);
+      doc.moveDown(mergedTheme.spacing.codeBlock);
+      continue; // Skip the closing ``` line
+    }
+    // HTML anchor tag (skip rendering)
+    else if (
+      trimmedLine.startsWith('<a name=') &&
+      trimmedLine.endsWith('</a>')
+    ) {
+      // Skip rendering HTML anchor tags
+      continue;
     }
     // Regular paragraph with inline formatting
     else {
       // Reset to normal font if coming from heading or list
-      doc.fontSize(12).font('Helvetica').lineGap(4);
+      doc
+        .fontSize(mergedTheme.fontSize.body)
+        .font(mergedTheme.fonts.body)
+        .lineGap(mergedTheme.spacing.lineGap);
 
-      // Process inline formatting
-      processInlineFormatting(trimmedLine, doc);
+      // Process inline formatting with explicit positioning
+      processInlineFormatting(
+        trimmedLine,
+        doc,
+        mergedTheme,
+        leftMargin,
+        contentWidth
+      );
 
       inList = false;
-      doc.moveDown(1); // Proper spacing after paragraphs
+      doc.moveDown(mergedTheme.spacing.paragraph);
+    }
+
+    // Force alignment reset after each element to prevent inheritance
+    if (i < lines.length - 1) {
+      doc.text('', leftMargin, doc.y, {
+        align: 'left',
+        continued: false,
+      });
     }
   }
 }
@@ -230,37 +472,116 @@ function renderMarkdownToPdf(markdown, doc) {
  * @param {string} [metadata.author] - The author's name
  * @param {string} [metadata.date] - The document date (defaults to current date if not provided)
  * @param {PDFDocument} doc - The PDFKit document instance
+ * @param {Object} theme - Optional theme settings to override defaults
  */
-function createCoverPage(metadata, doc) {
+function createCoverPage(metadata, doc, theme = {}) {
+  // Merge theme with defaults
+  const mergedTheme = {
+    ...DEFAULT_THEME,
+    fonts: { ...DEFAULT_THEME.fonts, ...theme.fonts },
+    fontSize: { ...DEFAULT_THEME.fontSize, ...theme.fontSize },
+    colors: { ...DEFAULT_THEME.colors, ...theme.colors },
+    margins: { ...DEFAULT_THEME.margins, ...theme.margins },
+    spacing: { ...DEFAULT_THEME.spacing, ...theme.spacing },
+  };
+
   // Set default values if metadata is missing
   const title = metadata?.title || 'Generated Document';
   const author = metadata?.author || '';
-  const date = metadata?.date || new Date().toLocaleDateString();
 
-  // Position in the middle of the page
-  const centerY = doc.page.height / 2 - 100;
+  // Parse the date properly, ensuring it's a Date object
+  let docDate;
+  try {
+    docDate = metadata?.date ? new Date(metadata.date) : new Date();
+    // Check if the date is valid
+    if (isNaN(docDate.getTime())) {
+      docDate = new Date(); // Fallback to current date if invalid
+    }
+  } catch (e) {
+    docDate = new Date(); // Fallback to current date on parsing error
+  }
 
-  // Title
-  doc.fontSize(28).font('Helvetica-Bold').text(title, {
+  const dateFormatted = docDate.toLocaleDateString();
+
+  // Update PDF document metadata with proper date format
+  doc.info = {
+    Title: title,
+    Author: author,
+    Subject: metadata?.description || 'Markdown Rendered PDF',
+    Keywords: metadata?.keywords || '',
+    Creator: 'PDF Microservice',
+    Producer: 'PDFKit',
+    CreationDate: docDate,
+  };
+
+  // Calculate the content width and margins for consistency
+  const leftMargin = doc.page.margins.left;
+  const contentWidth =
+    doc.page.width - doc.page.margins.left - doc.page.margins.right;
+
+  // Start at a good position from top of page
+  const titleY = 100;
+  let currentY = titleY;
+
+  // Ensure any previous alignment settings don't affect the cover page
+  doc.text('', { align: 'left', continued: false });
+
+  // Title - explicitly set to center alignment with fixed position
+  doc
+    .fontSize(mergedTheme.fontSize.h1 + 4) // Larger for title
+    .font(mergedTheme.fonts.heading)
+    .fillColor(mergedTheme.colors.heading);
+
+  // Calculate centered x position
+  const titleWidth = doc.widthOfString(title);
+  const titleX = (doc.page.width - titleWidth) / 2;
+
+  // Draw title centered
+  doc.text(title, titleX, currentY, {
+    width: titleWidth,
     align: 'center',
     lineGap: 8,
   });
 
-  doc.moveDown(2);
+  currentY = doc.y + 40; // move down for author
 
-  // Author
+  // Author - explicitly set to center alignment with fixed position
   if (author) {
-    doc.fontSize(14).font('Helvetica-Oblique').text(`By: ${author}`, {
+    doc.fontSize(mergedTheme.fontSize.h3 - 2).font(mergedTheme.fonts.italic);
+
+    // Calculate centered x position
+    const authorText = `By: ${author}`;
+    const authorWidth = doc.widthOfString(authorText);
+    const authorX = (doc.page.width - authorWidth) / 2;
+
+    // Draw author centered
+    doc.text(authorText, authorX, currentY, {
+      width: authorWidth,
       align: 'center',
       lineGap: 4,
     });
-    doc.moveDown(1);
+
+    currentY = doc.y + 20; // move down for date
   }
 
-  // Date
-  doc.fontSize(12).font('Helvetica').text(date, {
+  // Date - explicitly set to center alignment with fixed position
+  doc.fontSize(mergedTheme.fontSize.body).font(mergedTheme.fonts.body);
+
+  // Calculate centered x position
+  const dateWidth = doc.widthOfString(dateFormatted);
+  const dateX = (doc.page.width - dateWidth) / 2;
+
+  // Draw date centered
+  doc.text(dateFormatted, dateX, currentY, {
+    width: dateWidth,
     align: 'center',
     lineGap: 4,
+  });
+
+  // Reset alignment to left before adding a new page - position at left margin
+  doc.text('', leftMargin, doc.y, {
+    align: 'left',
+    continued: false,
   });
 
   // Add a new page after the cover
@@ -268,15 +589,26 @@ function createCoverPage(metadata, doc) {
 }
 
 /**
- * Adds a footer with page number to each page
+ * Adds a footer with page number to the current page
  * Useful for multi-page documents to help with navigation
  *
  * @param {PDFDocument} doc - The PDFKit document instance
+ * @param {number} currentPage - The current page number
  * @param {string} [footerText=''] - Optional additional footer text
+ * @param {Object} theme - Optional theme settings to override defaults
  */
-function addPageFooter(doc, footerText = '') {
-  const pageNumber = doc.bufferedPageRange().count;
-  const pageText = `Page ${pageNumber}`;
+function addPageFooter(
+  doc,
+  currentPage,
+  footerText = '',
+  theme = DEFAULT_THEME
+) {
+  // Save the current position and font settings
+  const originalY = doc.y;
+  const originalFont = doc._font ? doc._font.name : theme.fonts.body;
+  const originalFontSize = doc._fontSize || theme.fontSize.body;
+
+  const pageText = `Page ${currentPage}`;
   const combinedText = footerText ? `${footerText} | ${pageText}` : pageText;
 
   // Position at the bottom of the page
@@ -284,11 +616,20 @@ function addPageFooter(doc, footerText = '') {
   const textX = (doc.page.width - textWidth) / 2;
   const textY = doc.page.height - doc.page.margins.bottom + 12;
 
-  doc.fontSize(8).fillColor('#666666').text(combinedText, textX, textY, {
-    lineBreak: false,
-  });
+  // Move to footer position and add text
+  doc
+    .fontSize(theme.fontSize.footer)
+    .fillColor(theme.colors.footer)
+    .text(combinedText, textX, textY, { lineBreak: false });
 
-  doc.fillColor('black');
+  // Restore original position and font settings
+  doc
+    .fillColor(theme.colors.text)
+    .fontSize(originalFontSize)
+    .font(originalFont);
+
+  // Reset Y position to where we were before adding the footer
+  doc.y = originalY;
 }
 
 module.exports = {
@@ -296,4 +637,5 @@ module.exports = {
   createCoverPage,
   addPageFooter,
   processInlineFormatting,
+  DEFAULT_THEME,
 };
