@@ -90,6 +90,91 @@ function processInlineFormatting(
     width: contentWidth,
   });
 
+  // URL regex pattern for hyperlink detection
+  const urlPattern =
+    /(https?:\/\/[^\s()<>]+(?:\([^\s()<>]+\)|[^,\s`!()\[\]{};:'".,<>?«»""'']))/g;
+
+  // Process the text to handle URLs as hyperlinks
+  let processedText = text;
+  const matches = [...text.matchAll(urlPattern)];
+
+  // If we have URLs in the text, we need to handle them as hyperlinks
+  if (matches.length > 0) {
+    // For each URL match
+    let lastIndex = 0;
+    let segments = [];
+
+    for (const match of matches) {
+      const url = match[0];
+      const index = match.index;
+
+      // Add text before the URL
+      if (index > lastIndex) {
+        segments.push({
+          text: text.substring(lastIndex, index),
+          isLink: false,
+        });
+      }
+
+      // Add the URL as a link
+      segments.push({
+        text: url,
+        isLink: true,
+        url: url,
+      });
+
+      lastIndex = index + url.length;
+    }
+
+    // Add any remaining text after the last URL
+    if (lastIndex < text.length) {
+      segments.push({
+        text: text.substring(lastIndex),
+        isLink: false,
+      });
+    }
+
+    // Render each segment
+    for (const segment of segments) {
+      const options = getTextOptions(isFirstSegment);
+
+      if (isFirstSegment) {
+        isFirstSegment = false;
+
+        if (segment.isLink) {
+          doc.fillColor(theme.colors.link).text(segment.text, startX, doc.y, {
+            ...options,
+            link: segment.url,
+            underline: true,
+          });
+          doc.fillColor(theme.colors.text);
+        } else {
+          doc.text(segment.text, startX, doc.y, options);
+        }
+      } else {
+        if (segment.isLink) {
+          doc.fillColor(theme.colors.link).text(segment.text, {
+            ...options,
+            link: segment.url,
+            underline: true,
+          });
+          doc.fillColor(theme.colors.text);
+        } else {
+          doc.text(segment.text, options);
+        }
+      }
+    }
+
+    // End the line with explicit alignment
+    doc.text('', {
+      continued: false,
+      align: 'left',
+      width: contentWidth,
+    });
+
+    return;
+  }
+
   // Handle formatting in a more robust way with replacements
   // Process formatting in order of precedence: code, bold, italic
   let processed = text;
@@ -196,6 +281,19 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
     spacing: { ...DEFAULT_THEME.spacing, ...theme.spacing },
   };
 
+  // Define consistent spacing values
+  const SPACING = {
+    heading1: mergedTheme.spacing.heading1 * 0.4 || 0.3, // Significantly reduced
+    heading2: mergedTheme.spacing.heading2 * 0.4 || 0.25, // Significantly reduced
+    heading3: mergedTheme.spacing.heading3 * 0.4 || 0.2, // Significantly reduced
+    paragraph: mergedTheme.spacing.paragraph || 0.2,
+    list: mergedTheme.spacing.list * 0.7 || 0.2,
+    listWithUrl: 1.0, // More space for list items with URLs
+    blockquote: mergedTheme.spacing.blockquote * 0.7 || 0.2,
+    codeBlock: mergedTheme.spacing.codeBlock * 0.7 || 0.3,
+    emptyLine: 0.3, // Smaller space for empty lines
+  };
+
   // Add metadata to the PDF - ensures proper date format
   const creationDate = new Date();
   if (!doc.info) {
@@ -231,6 +329,10 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
   doc.lineGap(mergedTheme.spacing.lineGap); // Add consistent line spacing throughout the document
   doc.fillColor(mergedTheme.colors.text);
 
+  // URL detection regex
+  const urlPattern =
+    /(https?:\/\/[^\s()<>]+(?:\([^\s()<>]+\)|[^,\s`!()\[\]{};:'".,<>?«»""'']))/g;
+
   // CRITICAL: Calculate content width and positions for consistent rendering
   const leftMargin = doc.page.margins.left;
   const rightMargin = doc.page.margins.right;
@@ -252,7 +354,7 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
 
     // Skip empty lines
     if (!trimmedLine) {
-      doc.moveDown(0.5); // Reduced spacing for empty lines
+      doc.moveDown(SPACING.emptyLine); // Reduced spacing for empty lines
       continue;
     }
 
@@ -269,10 +371,10 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
         .text(trimmedLine.replace('# ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: mergedTheme.spacing.lineGap + 2,
+          lineGap: mergedTheme.spacing.lineGap + 1, // Slightly increased for headings
           width: contentWidth,
         });
-      doc.moveDown(mergedTheme.spacing.heading1);
+      doc.moveDown(SPACING.heading1); // Significantly reduced spacing
       doc.fillColor(mergedTheme.colors.text);
     }
     // Heading 2
@@ -285,10 +387,10 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
         .text(trimmedLine.replace('## ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: mergedTheme.spacing.lineGap,
+          lineGap: mergedTheme.spacing.lineGap + 0.5, // Slightly increased for headings
           width: contentWidth,
         });
-      doc.moveDown(mergedTheme.spacing.heading2);
+      doc.moveDown(SPACING.heading2); // Significantly reduced spacing
       doc.fillColor(mergedTheme.colors.text);
     }
     // Heading 3
@@ -301,16 +403,20 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
         .text(trimmedLine.replace('### ', ''), leftMargin, currentY, {
           align: 'left',
           underline: false,
-          lineGap: mergedTheme.spacing.lineGap - 1,
+          lineGap: mergedTheme.spacing.lineGap, // Standard line gap for smaller headings
           width: contentWidth,
         });
-      doc.moveDown(mergedTheme.spacing.heading3);
+      doc.moveDown(SPACING.heading3); // Significantly reduced spacing
       doc.fillColor(mergedTheme.colors.text);
     }
     // Bullet List
     else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
       const listContent = trimmedLine.substring(2);
       const listIndent = 20;
+      const hasUrl = urlPattern.test(listContent);
+
+      // Increase spacing for bibliography/reference items with URLs
+      const listItemWidth = contentWidth - listIndent - 10;
 
       doc.fontSize(mergedTheme.fontSize.body).font(mergedTheme.fonts.body);
 
@@ -319,25 +425,32 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
       doc.text('• ', leftMargin + listIndent, currentY, {
         continued: true,
         align: 'left',
-        width: contentWidth - listIndent,
+        width: 10,
       });
 
       // Process any inline formatting in the list item
+      // References with URLs need better formatting
+      const listX = leftMargin + listIndent + 10;
       processInlineFormatting(
         listContent,
         doc,
         mergedTheme,
-        leftMargin + listIndent + 10,
-        contentWidth - listIndent - 10
+        listX,
+        listItemWidth
       );
 
       inList = true;
-      doc.moveDown(mergedTheme.spacing.list);
+      // Use more spacing for list items with URLs (like in references/bibliography)
+      doc.moveDown(hasUrl ? SPACING.listWithUrl : SPACING.list);
     }
     // Numbered list
     else if (/^\d+\.\s/.test(trimmedLine)) {
       const listContent = trimmedLine.replace(/^\d+\.\s/, '');
       const listIndent = 20;
+      const hasUrl = urlPattern.test(listContent);
+
+      // Increase spacing for bibliography/reference items with URLs
+      const listItemWidth = contentWidth - listIndent - 20;
 
       doc.fontSize(mergedTheme.fontSize.body).font(mergedTheme.fonts.body);
 
@@ -346,20 +459,22 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
       doc.text(`${number} `, leftMargin + listIndent, currentY, {
         continued: true,
         align: 'left',
-        width: contentWidth - listIndent,
+        width: 20,
       });
 
       // Process any inline formatting in the list item
+      const listX = leftMargin + listIndent + 20;
       processInlineFormatting(
         listContent,
         doc,
         mergedTheme,
-        leftMargin + listIndent + 20,
-        contentWidth - listIndent - 20
+        listX,
+        listItemWidth
       );
 
       inList = true;
-      doc.moveDown(mergedTheme.spacing.list);
+      // Use more spacing for list items with URLs (like in references/bibliography)
+      doc.moveDown(hasUrl ? SPACING.listWithUrl : SPACING.list);
     }
     // Blockquote
     else if (trimmedLine.startsWith('> ')) {
@@ -378,7 +493,7 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
         });
 
       doc.fillColor(mergedTheme.colors.text);
-      doc.moveDown(mergedTheme.spacing.blockquote);
+      doc.moveDown(SPACING.blockquote); // Reduced spacing
     }
     // Horizontal rule
     else if (trimmedLine.match(/^[\-\*\_]{3,}$/)) {
@@ -386,7 +501,7 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
         .moveTo(leftMargin, doc.y)
         .lineTo(doc.page.width - rightMargin, doc.y)
         .stroke();
-      doc.moveDown(1);
+      doc.moveDown(0.5); // Reduced spacing for horizontal rule
     }
     // Code block
     else if (trimmedLine.startsWith('```')) {
@@ -420,7 +535,7 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
 
       // Skip to the end of code block
       i = codeBlockEnd;
-      doc.moveDown(mergedTheme.spacing.codeBlock);
+      doc.moveDown(SPACING.codeBlock); // Reduced spacing
       continue; // Skip the closing ``` line
     }
     // HTML anchor tag (skip rendering)
@@ -449,7 +564,7 @@ function renderMarkdownToPdf(markdown, doc, theme = {}) {
       );
 
       inList = false;
-      doc.moveDown(mergedTheme.spacing.paragraph);
+      doc.moveDown(SPACING.paragraph); // Reduced spacing
     }
 
     // Force alignment reset after each element to prevent inheritance
